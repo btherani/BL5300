@@ -1,6 +1,7 @@
 library(dada2)
 library(DESeq2)
 library(tidyverse)
+library(phyloseq)
 
 path <- "~/data/Caspian/Caspian_Water"
 list.files(path)
@@ -99,10 +100,17 @@ names(dna) <- taxa_names(ps)
 ps <- merge_phyloseq(ps, dna)
 taxa_names(ps) <- paste0("ASV", seq(ntaxa(ps)))
 ps
-plot_richness(ps, x="Type", measures=c("Shannon", "Simpson"), color="Type")
+
+p=plot_richness(ps, x="Type", measures=c("Observed", "Simpson"), color="Type")
+p+geom_boxplot()
+
 
 ps.prop <- transform_sample_counts(ps, function(otu) otu/sum(otu))
 ord.pcoa.bray <- ordinate(ps.prop, method="PCoA", distance="bray")
-plot_ordination(ps.prop, ord.pcoa.bray, color="When", title="Bray PCoA")
+plot_ordination(ps.prop, ord.pcoa.bray, color="Type", title="Bray PCoA")
 
 
+top20 <- names(sort(taxa_sums(ps), decreasing=TRUE))[1:20]
+ps.top20 <- transform_sample_counts(ps, function(OTU) OTU/sum(OTU))
+ps.top20 <- prune_taxa(top20, ps.top20)
+plot_bar(ps.top20, x="Day", fill="Family") + facet_wrap(~Type, scales="free_x")
