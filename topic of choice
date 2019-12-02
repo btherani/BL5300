@@ -54,7 +54,8 @@ dadaFs_sediment <- dada(filtFs_sediment, err=errF_sediment, multithread=TRUE)
 dadaFs_water[[1]]
 dadaFs_sediment[[1]]
 
-metadata <- read_csv("Caspian_Metadata.txt")
+metadata <- read_tsv("Caspian_Metadata.txt")
+rownames(metadata)<-metadata$File_name
 
 seqtab_sediment <- makeSequenceTable(dadaFs_sediment)
 dim(seqtab_sediment)
@@ -91,7 +92,7 @@ head(taxa.print)
 
 
 ps <- phyloseq(otu_table(myfulldata, taxa_are_rows=FALSE), 
-               sample_data(samdf))
+               sample_data(metadata))
 
 dna <- Biostrings::DNAStringSet(taxa_names(ps))
 names(dna) <- taxa_names(ps)
