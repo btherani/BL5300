@@ -80,7 +80,7 @@ sum(seqtab.nochim_water)/sum(seqtab_water)
 myfulldata <- mergeSequenceTables(table1=seqtab.nochim_water, table2=seqtab.nochim_sediment)
 
 saveRDS(myfulldata, file="mydata.rds")
-
+myfulldata<-readRDS("mydata.rds") 
 
 taxa <- assignTaxonomy(seqtab.nochim_sediment, "silva_nr_v132_train_set.fa.gz")
 
