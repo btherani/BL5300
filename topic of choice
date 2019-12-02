@@ -6,25 +6,102 @@ path <- "~/data/Caspian/Caspian_Water"
 list.files(path)
 
 fnFs_Water <- sort(list.files(path, pattern="_R1_001.fastq", full.names = TRUE))
-fnRs_Water <- sort(list.files(path, pattern="_R2_001.fastq", full.names = TRUE))
+
+path2 <- "~/data/Caspian/Caspian_Sediment"
+list.files(path2)
+
+fnFs_Sediment <- sort(list.files(path2, full.names = TRUE))
 
 list(fnFs_Water)
-list(fnRs_Water)
+list(fnFs_Sediment)
 
 names_water <- sapply(strsplit(basename(fnFs_Water), "_"), `[`, 1)
+names_sediment <- sapply(strsplit(basename(fnFs_Sediment), "_"), `[`, 1)
 
-plotQualityProfile(fnFs_Water[18:19])
-plotQualityProfile(fnRs_Water[1:2])
+
+plotQualityProfile(fnFs_Water[1:2])
+plotQualityProfile(fnFs_Sediment[1:2])
 
 filtFs_water <- file.path(path, "filtered", paste0(names_water, "_F_filt.fastq.gz"))
-filtRs_water <- file.path(path, "filtered", paste0(names_water, "_R_filt.fastq.gz"))
-names(filtFs_water) <- names_water
-names(filtRs_water) <- names_water
+filtFs_sediment <- file.path(path2, "filtered", paste0(names_sediment, "_F_filt.fastq.gz"))
 
-out <- filterAndTrim(fnFs_Water, filtFs_water, fnRs_Water, filtRs_water, truncLen=c(180,160),
-                     maxN=0, maxEE=c(2,2), truncQ=2, rm.phix=TRUE,
+names(filtFs_water) <- names_water
+names(filtFs_sediment) <- names_sediment
+
+
+
+
+
+
+out_water <- filterAndTrim(fnFs_Water, filtFs_water, truncLen=c(160),
+                     maxN=0, maxEE=c(2), truncQ=2, rm.phix=TRUE,
                      compress=TRUE)
 
-errF_water <- learnErrors(filtFs_water)
-errR_water <- learnErrors(filtRs_water)
+out_sediment <- filterAndTrim(fnFs_Sediment, filtFs_sediment, truncLen=c(160),
+                           maxN=0, maxEE=c(2), truncQ=2, rm.phix=TRUE,
+                           compress=TRUE)
+
+
+errF_water <- learnErrors(filtFs_water, multithread=TRUE)
+errF_sediment <- learnErrors(filtFs_sediment, multithread=TRUE)
+
 plotErrors(errF_water, nominalQ=TRUE)
+plotErrors(errF_sediment, nominalQ=TRUE)
+
+dadaFs_water <- dada(filtFs_water, err=errF_water, multithread=TRUE)
+dadaFs_sediment <- dada(filtFs_sediment, err=errF_sediment, multithread=TRUE)
+
+dadaFs_water[[1]]
+dadaFs_sediment[[1]]
+
+metadata <- read_csv("Caspian_Metadata.txt")
+
+seqtab_sediment <- makeSequenceTable(dadaFs_sediment)
+dim(seqtab_sediment)
+
+seqtab_water <- makeSequenceTable(dadaFs_water)
+dim(seqtab_water)
+
+seqtab.nochim_sediment <- removeBimeraDenovo(seqtab_sediment, method="consensus", verbose=TRUE, multithread=TRUE)
+dim(seqtab.nochim_sediment)
+
+sum(seqtab.nochim_sediment)/sum(seqtab_sediment)
+
+seqtab.nochim_water <- removeBimeraDenovo(seqtab_water, method="consensus", verbose=TRUE, multithread=TRUE)
+dim(seqtab.nochim_water)
+
+sum(seqtab.nochim_water)/sum(seqtab_water)
+
+
+
+
+myfulldata <- mergeSequenceTables(table1=seqtab.nochim_water, table2=seqtab.nochim_sediment)
+
+saveRDS(myfulldata, file="mydata.rds")
+
+
+taxa <- assignTaxonomy(seqtab.nochim_sediment, "silva_nr_v132_train_set.fa.gz")
+
+taxa <- addSpecies(taxa, "silva_species_assignment_v132.fa.gz")
+taxa.print <- taxa
+rownames(taxa.print) <- NULL
+head(taxa.print)
+
+
+
+
+ps <- phyloseq(otu_table(myfulldata, taxa_are_rows=FALSE), 
+               sample_data(samdf))
+
+dna <- Biostrings::DNAStringSet(taxa_names(ps))
+names(dna) <- taxa_names(ps)
+ps <- merge_phyloseq(ps, dna)
+taxa_names(ps) <- paste0("ASV", seq(ntaxa(ps)))
+ps
+plot_richness(ps, x="Type", measures=c("Shannon", "Simpson"), color="Type")
+
+ps.prop <- transform_sample_counts(ps, function(otu) otu/sum(otu))
+ord.pcoa.bray <- ordinate(ps.prop, method="PCoA", distance="bray")
+plot_ordination(ps.prop, ord.pcoa.bray, color="When", title="Bray PCoA")
+
+
