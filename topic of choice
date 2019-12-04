@@ -29,18 +29,13 @@ filtFs_sediment <- file.path(path2, "filtered", paste0(names_sediment, "_F_filt.
 names(filtFs_water) <- names_water
 names(filtFs_sediment) <- names_sediment
 
-
-
-
-
-
 out_water <- filterAndTrim(fnFs_Water, filtFs_water, truncLen=c(160),
                      maxN=0, maxEE=c(2), truncQ=2, rm.phix=TRUE,
-                     compress=TRUE)
+                     compress=TRUE,multithread = TRUE)
 
 out_sediment <- filterAndTrim(fnFs_Sediment, filtFs_sediment, truncLen=c(160),
                            maxN=0, maxEE=c(2), truncQ=2, rm.phix=TRUE,
-                           compress=TRUE)
+                           compress=TRUE,multithread = TRUE)
 
 
 errF_water <- learnErrors(filtFs_water, multithread=TRUE)
@@ -74,26 +69,46 @@ dim(seqtab.nochim_water)
 
 sum(seqtab.nochim_water)/sum(seqtab_water)
 
+saveRDS(seqtab.nochim_sediment, "sediment_seqtab.rds")
+saveRDS(seqtab.nochim_water, "sediment_seqtab.rds")
+## Merge non-chimera checked tables and check chimeras for full table.
+combined<-mergeSequenceTables(table1=seqtab_sediment,table2=seqtab_water)
+seqtab.nochim_water <- removeBimeraDenovo(combined, method="consensus", verbose=TRUE, multithread=TRUE)
 
+saveRDS(combined,"combined_table.rds")
+combined<-readRDS("combined_table.rds")
+
+taxa_combined<-assignTaxonomy(combined, "silva_nr_v132_train_set.fa.gz", multithread=TRUE)
+
+seqtab.nochim_water=readRDS("sediment_seqtab.rds")
+
+taxa_water<-assignTaxonomy(seqtab.nochim_water, "silva_nr_v132_train_set.fa.gz", multithread=TRUE)
+taxa_sediment<-assignTaxonomy(seqtab.nochim_sediment, "silva_nr_v132_train_set.fa.gz", multithread=TRUE)
 
 
 myfulldata <- mergeSequenceTables(table1=seqtab.nochim_water, table2=seqtab.nochim_sediment)
 
 saveRDS(myfulldata, file="mydata.rds")
+
 myfulldata<-readRDS("mydata.rds") 
 
-taxa <- assignTaxonomy(seqtab.nochim_sediment, "silva_nr_v132_train_set.fa.gz")
+taxa <- assignTaxonomy(myfulldata, "taxonomy/silva_nr_v132_train_set.fa.gz", multithread=TRUE)
 
-taxa <- addSpecies(taxa, "silva_species_assignment_v132.fa.gz")
+taxa <- addSpecies(taxa, "silva_species_assignment_v132.fa.gz", multithread=TRUE)
 taxa.print <- taxa
 rownames(taxa.print) <- NULL
 head(taxa.print)
 
+combined2<-readRDS("combined_table2.rds")
+taxa<-readRDS("taxa_combined.rds")
+taxa <- addSpecies(taxa, "silva_species_assignment_v132.fa.gz")
+saveRDS(taxa,"taxa_species.rds")
 
+taxa_species<-readRDS("taxa_species.rds")
 
-
-ps <- phyloseq(otu_table(myfulldata, taxa_are_rows=FALSE), 
-               sample_data(metadata))
+ps <- phyloseq(otu_table(combined, taxa_are_rows=FALSE), 
+               sample_data(metadata), 
+               tax_table(taxa))
 
 dna <- Biostrings::DNAStringSet(taxa_names(ps))
 names(dna) <- taxa_names(ps)
@@ -113,4 +128,4 @@ plot_ordination(ps.prop, ord.pcoa.bray, color="Type", title="Bray PCoA")
 top20 <- names(sort(taxa_sums(ps), decreasing=TRUE))[1:20]
 ps.top20 <- transform_sample_counts(ps, function(OTU) OTU/sum(OTU))
 ps.top20 <- prune_taxa(top20, ps.top20)
-plot_bar(ps.top20, x="Day", fill="Family") + facet_wrap(~Type, scales="free_x")
+plot_bar(ps.top20, x="SampleID", fill="Family") + facet_wrap(~Type, scales="free_x")
