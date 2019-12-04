@@ -39,6 +39,9 @@ out_sediment <- filterAndTrim(fnFs_Sediment, filtFs_sediment, truncLen=c(160),
 
 
 errF_water <- learnErrors(filtFs_water, multithread=TRUE)
+
+#112849120 total bases in 705307 reads from 6 samples will be used for learning the error rates.
+
 errF_sediment <- learnErrors(filtFs_sediment, multithread=TRUE)
 
 plotErrors(errF_water, nominalQ=TRUE)
