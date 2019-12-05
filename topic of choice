@@ -132,3 +132,47 @@ top20 <- names(sort(taxa_sums(ps), decreasing=TRUE))[1:20]
 ps.top20 <- transform_sample_counts(ps, function(OTU) OTU/sum(OTU))
 ps.top20 <- prune_taxa(top20, ps.top20)
 plot_bar(ps.top20, x="SampleID", fill="Family") + facet_wrap(~Type, scales="free_x")
+
+
+
+classabundance <- ps %>%
+  tax_glom(taxrank = "Class") %>%                     # agglomerate at class level
+  transform_sample_counts(function(x) {x/sum(x)} ) %>% # Transform to rel. abundance
+  psmelt() %>%                                         # Melt to long format
+  arrange(Class) 
+head(classabundance)
+
+##Filter out low abundance classes
+
+class <- classabundance %>%
+  select(Class, SampleID, Type, Abundance) %>%
+  group_by(Class, SampleID, Type) %>%
+  filter(Abundance > 0.05)
+head(class)
+
+## Create a category that groups all taxa less than 5% of the community into a category of other
+other<-classabundance %>%
+  select(Class, SampleID, Type, Abundance) %>%
+  group_by(Class, SampleID, Type) %>%
+  filter(Abundance < 0.05 & Abundance>0)
+
+other2<-other%>%
+  group_by(SampleID)%>%
+  summarise(Abundance = sum(Abundance))%>%
+  mutate(Class="Other")%>%
+  inner_join(metadata,by="SampleID")%>%
+  select(Class, SampleID, Type, Abundance)
+full<-bind_rows(class, other2)
+
+
+#Load a manual color scheme
+Color_22_Palette <- c("darkgray", "blue", "aquamarine", "deepskyblue", "chocolate", "navy", "green","gold","hotpink3","orangered","magenta","orange","black","cyan","seagreen","royalblue","red","purple","black","tan1","orangered","orange","blue")
+
+
+#Make the plot
+ggplot(full, aes(x=SampleID, y=Abundance, fill= Class))+
+  geom_bar(stat="identity",position="stack",color="black")+
+  scale_fill_manual(values = Color_22_Palette)+
+  theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5))+
+  theme(legend.position = "bottom")+
+  theme(legend.text=element_text(size=15))
